@@ -4,157 +4,157 @@
   <meta charset="utf-8">
   <title>Dice Duel</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     body {
       font-family: sans-serif;
       text-align: center;
-      padding: 40px;
+      padding: 20px;
       background: #f0f0f0;
+      margin: 0;
     }
     button {
-      padding: 15px 30px;
-      font-size: 20px;
-      margin: 20px;
+      padding: 14px 28px;
+      font-size: 18px;
+      margin: 12px 0;
       border: none;
-      background: #3b82f6;
-      color: white;
       border-radius: 10px;
       cursor: pointer;
     }
+    #mainBtns { margin-top: 20px; }
+    .blue { background: #3b82f6; color: white; }
+    .red { background: #ef4444; color: white; }
+    .green { background: #10b981; color: white; }
+    input {
+      padding: 12px;
+      font-size: 18px;
+      width: 180px;
+      margin: 10px 8px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+    }
+    #betInput { display: none; }
   </style>
 </head>
 <body>
   <h2>🎲 Dice Duel</h2>
   <p id="welcome">Загрузка...</p>
-  <p id="balance" style="font-size: 20px; font-weight: bold; color: #eab308;">💰 Баланс: 500 монет</p>
-  <button id="roll">Бросить кубик</button>
-  <button id="challenge" style="background: #ef4444;">Вызвать друга</button>
+  <p id="balance">💰 Баланс: — монет</p>
+
+  <div id="mainBtns">
+    <button id="roll" class="blue">Бросить кубик</button>
+    <button id="challenge" class="red">Вызвать друга</button>
+  </div>
+
+  <div id="betInput">
+    <input type="number" id="betAmount" placeholder="Ставка (мин. 10)" min="10">
+    <br>
+    <button id="confirmBet" class="green">Создать дуэль</button>
+    <button id="cancelBet" class="blue">Отмена</button>
+  </div>
+
   <div id="result"></div>
 
-<script type="module">
-  // Подключаем Supabase
-  import { createClient } from 'https://esm.sh/@supabase/supabase-js';
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      const welcomeEl = document.getElementById('welcome');
+      const balanceEl = document.getElementById('balance');
 
-  const supabase = createClient(
-    'https://jcmckitvoqbuljadcfev.supabase.co',   // ← замени!
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjbWNraXR2b3FidWxqYWRjZmV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE4NTYxMDIsImV4cCI6MjA3NzQzMjEwMn0.JI5Y2-cSxgGB-j9LtczU5vENrYhSS4Q_EeLAYLauDBU'                          // ← замени!
-  );
+      // Проверяем, запущено ли приложение в Telegram
+      if (!window.Telegram || !window.Telegram.WebApp || !window.Telegram.WebApp.initDataUnsafe) {
+        welcomeEl.textContent = '❌ Откройте игру через Telegram!';
+        balanceEl.style.display = 'none';
+        document.getElementById('mainBtns').style.display = 'none';
+        return;
+      }
 
-const initData = window.Telegram.WebApp.initDataUnsafe;
-if (!initData || !initData.user) {
-  document.getElementById('welcome').textContent = 'Ошибка: откройте через Telegram!';
-  throw new Error('Not in Telegram');
-}
+      const initData = window.Telegram.WebApp.initDataUnsafe;
+      const user = initData.user;
+      const userId = String(user.id);
+      const username = user.username || user.first_name || 'друг';
 
-const user = initData.user;
-const userId = String(user.id); // безопасное преобразование
-const username = user.username || user.first_name || 'друг';
-const startParam = initData.start_param;
+      // Баланс
+      let balance = localStorage.getItem('dice_balance');
+      if (balance === null) {
+        balance = 500;
+        localStorage.setItem('dice_balance', '500');
+      } else {
+        balance = Number(balance);
+      }
 
-  document.getElementById('welcome').textContent = `Привет, ${username}!`;
+      welcomeEl.textContent = `Привет, ${username}!`;
+      balanceEl.textContent = `💰 Баланс: ${balance} монет`;
 
-  // Баланс
-  let balance = 500;
-  if (localStorage.getItem('dice_balance')) {
-    balance = Number(localStorage.getItem('dice_balance'));
-  } else {
-    localStorage.setItem('dice_balance', '500');
-  }
-  document.getElementById('balance').textContent = `💰 Баланс: ${balance} монет`;
+      // Подключаем Supabase
+      const supabase = window.supabase.createClient(
+        'https://jcmckitvoqbuljadcfev.supabase.co',
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjbWNraXR2b3FidWxqYWRjZmV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE4NTYxMDIsImV4cCI6MjA3NzQzMjEwMn0.JI5Y2-cSxgGB-j9LtczU5vENrYhSS4Q_EeLAYLauDBU'
+      );
 
-  // Если это дуэль по ID
-  if (startParam && !startParam.startsWith('duel_') && startParam.length === 8) {
-    loadDuel(startParam);
-  }
+      // === КНОПКИ ===
 
-  // Вызов друга → создаём дуэль
-  document.getElementById('challenge').onclick = async () => {
-    const betStr = prompt('Сколько монет поставить? (Минимум: 10)');
-    const bet = parseInt(betStr);
+      // Бросок кубика
+      document.getElementById('roll').onclick = () => {
+        const dice = Math.floor(Math.random() * 6) + 1;
+        document.getElementById('result').innerHTML = `<h2>Выпало: ${dice}!</h2>`;
+        if (window.navigator.vibrate) window.navigator.vibrate(100);
+      };
 
-    if (!betStr || isNaN(bet) || bet < 10 || bet > balance) {
-      alert('Некорректная ставка или недостаточно монет!');
-      return;
-    }
+      // Вызвать друга — показываем поле ввода
+      document.getElementById('challenge').onclick = () => {
+        document.getElementById('betInput').style.display = 'block';
+        document.getElementById('mainBtns').style.display = 'none';
+      };
 
-    // Генерируем короткий ID (8 символов)
-    const id = Math.random().toString(36).substring(2, 10);
-    await supabase.from('duels').insert({
-      id,
-      player_a: userId,
-      bet,
-      status: 'waiting'
-    });
+      // Отмена
+      document.getElementById('cancelBet').onclick = () => {
+        document.getElementById('betInput').style.display = 'none';
+        document.getElementById('mainBtns').style.display = 'block';
+        document.getElementById('betAmount').value = '';
+      };
 
-    const BOT_NAME = 'kostochki_game_bot';
-    let mention = user?.first_name || 'Игрок';
-    if (user?.username) mention = `@${user.username}`;
+      // Подтверждение ставки
+      document.getElementById('confirmBet').onclick = async () => {
+        const betStr = document.getElementById('betAmount').value.trim();
+        const bet = parseInt(betStr);
 
-    const message = `${mention} вызывает на дуэль! Ставка: ${bet} монет 🎲\n\nИграть: https://t.me/${BOT_NAME}?startapp=${id}`;
-
-    navigator.clipboard.writeText(message).then(() => {
-      alert('✅ Ссылка скопирована! Отправь другу.');
-    });
-  };
-
-  async function loadDuel(duelId) {
-    const { data, error } = await supabase
-      .from('duels')
-      .select('*')
-      .eq('id', duelId)
-      .single();
-
-    if (error || !data) {
-      document.getElementById('welcome').textContent = 'Дуэль не найдена.';
-      return;
-    }
-
-    if (data.player_a === userId) {
-      document.getElementById('welcome').textContent = 'Ты уже создал эту дуэль!';
-      return;
-    }
-
-    if (data.status === 'waiting') {
-      document.getElementById('welcome').innerHTML = `Вызов от игрока!<br>Ставка: ${data.bet} монет`;
-      document.getElementById('roll').style.display = 'none';
-      document.getElementById('challenge').style.display = 'none';
-
-      const acceptBtn = document.createElement('button');
-      acceptBtn.textContent = 'Принять дуэль';
-      acceptBtn.style.cssText = 'padding:15px 30px;font-size:20px;margin:20px;border:none;background:#10b981;color:white;border-radius:10px;cursor:pointer;';
-      acceptBtn.onclick = async () => {
-        // Принимаем дуэль
-        const { error: updError } = await supabase
-          .from('duels')
-          .update({ player_b: userId, status: 'active' })
-          .eq('id', duelId)
-          .eq('status', 'waiting');
-
-        if (updError) {
-          alert('Не удалось принять дуэль (возможно, уже принята)');
+        if (!betStr || isNaN(bet) || bet < 10) {
+          alert('Введите ставку от 10 монет!');
+          return;
+        }
+        if (bet > balance) {
+          alert('Недостаточно монет!');
           return;
         }
 
-        // Начинаем игру
-        startRealDuel(data.bet, duelId);
-      };
-      document.body.appendChild(acceptBtn);
-    }
-  }
+        // Генерируем короткий ID дуэли (8 символов)
+        const id = Math.random().toString(36).substring(2, 10);
 
-  async function startRealDuel(bet, duelId) {
-    // Здесь будет логика 3 раундов с сохранением результата
-    alert(`Дуэль на ${bet} монет началась! (Реализация — в следующем шаге)`);
-  }
+        // Сохраняем в Supabase
+        const { error } = await supabase.from('duels').insert({
+          id: id,
+          player_a: userId,
+          bet: bet,
+          status: 'waiting'
+        });
 
-  // Обычный бросок
-  document.getElementById('roll').onclick = () => {
-    const dice = Math.floor(Math.random() * 6) + 1;
-    document.getElementById('result').innerHTML = `<h1>Выпало: ${dice}!</h1>`;
-    if (window.navigator.vibrate) window.navigator.vibrate(100);
-  };
+        if (error) {
+          console.error('Ошибка Supabase:', error);
+          alert('Не удалось создать дуэль. Попробуйте позже.');
+          return;
+        }
 
-  Telegram.WebApp.ready();
-</script>
-</body>
-</html>
+        // Формируем сообщение
+        const mention = user.username ? `@${user.username}` : user.first_name;
+        const message = `${mention} вызывает на дуэль! Ставка: ${bet} монет 🎲\n\nИграть: https://t.me/kostochki_game_bot?startapp=${id}`;
+
+        // Копируем — это работает, потому что вызвано из кнопки
+        navigator.clipboard.writeText(message).then(() => {
+          alert('✅ Ссылка скопирована!\nОтправьте её другу в чат.');
+          document.getElementById('betInput').style.display = 'none';
+          document.getElementById('mainBtns').style.display = 'block';
+          document.getElementById('betAmount').value = '';
+        }).catch(() => {
+          // Если копирование не сработало — показываем сообщение
+          prompt('❌ Копирование заблокировано. Скопируйте вручную:', message);
+          document.getElementById('betInput').style.display = 'none';
