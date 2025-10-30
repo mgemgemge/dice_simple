@@ -32,10 +32,10 @@
   <div id="result"></div>
 
   <script>
-  // Получаем данные из Telegram
   const initData = window.Telegram.WebApp.initDataUnsafe;
   const user = initData?.user;
   const username = user?.username || user?.first_name || 'друг';
+  const startParam = initData?.start_param; // ← получаем duel_100
 
   document.getElementById('welcome').textContent = `Привет, ${username}!`;
 
@@ -48,7 +48,71 @@
   }
   document.getElementById('balance').textContent = `💰 Баланс: ${balance} монет`;
 
-  // Бросок кубика
+  // Проверяем, запущена ли дуэль
+  let duelBet = 0;
+  if (startParam && startParam.startsWith('duel_')) {
+    const bet = parseInt(startParam.split('_')[1]);
+    if (bet > 0) {
+      duelBet = bet;
+      document.getElementById('welcome').innerHTML = `🎲 Дуэль на ${duelBet} монет!`;
+      document.getElementById('roll').style.display = 'none'; // скрываем обычный бросок
+      document.getElementById('challenge').style.display = 'none';
+
+      // Показываем кнопку "Начать дуэль"
+      const duelBtn = document.createElement('button');
+      duelBtn.textContent = 'Начать дуэль (3 раунда)';
+      duelBtn.style.cssText = 'padding:15px 30px;font-size:20px;margin:20px;border:none;background:#10b981;color:white;border-radius:10px;cursor:pointer;';
+      duelBtn.onclick = startDuel;
+      document.body.appendChild(duelBtn);
+    }
+  }
+
+  function startDuel() {
+    let playerScore = 0;
+    let botScore = 0;
+    let round = 1;
+    const maxRounds = 3;
+    const resultDiv = document.getElementById('result');
+    resultDiv.innerHTML = '<p>Дуэль началась!</p>';
+
+    function playRound() {
+      if (round > maxRounds) {
+        // Итог
+        const diff = playerScore - botScore;
+        let message = `Итог: ${playerScore} : ${botScore}<br>`;
+        if (diff > 0) {
+          message += `🏆 Ты выиграл ${duelBet} монет!`;
+          balance += duelBet;
+        } else if (diff < 0) {
+          message += `💀 Ты проиграл ${duelBet} монет.`;
+          balance -= duelBet;
+        } else {
+          message += `🤝 Ничья! Ставка возвращена.`;
+        }
+        localStorage.setItem('dice_balance', String(balance));
+        document.getElementById('balance').textContent = `💰 Баланс: ${balance} монет`;
+        resultDiv.innerHTML = `<h2>${message}</h2>`;
+        return;
+      }
+
+      // Бросок игрока и "бота"
+      const playerDice = Math.floor(Math.random() * 6) + 1;
+      const botDice = Math.floor(Math.random() * 6) + 1;
+
+      if (playerDice > botDice) playerScore++;
+      else if (botDice > playerDice) botScore++;
+
+      resultDiv.innerHTML += `<p>Раунд ${round}: Ты ${playerDice} — Бот ${botDice}</p>`;
+      if (window.navigator.vibrate) window.navigator.vibrate(100);
+
+      round++;
+      setTimeout(playRound, 1500); // пауза между раундами
+    }
+
+    playRound();
+  }
+
+  // Обычный бросок (если не дуэль)
   document.getElementById('roll').onclick = () => {
     const dice = Math.floor(Math.random() * 6) + 1;
     document.getElementById('result').innerHTML = `<h1>Выпало: ${dice}!</h1>`;
@@ -56,38 +120,31 @@
   };
 
   // Вызов друга
-document.getElementById('challenge').onclick = () => {
-  const betStr = prompt('Сколько монет поставить? (Минимум: 10)');
-  const bet = parseInt(betStr);
+  document.getElementById('challenge').onclick = () => {
+    const betStr = prompt('Сколько монет поставить? (Минимум: 10)');
+    const bet = parseInt(betStr);
 
-  if (!betStr || isNaN(bet) || bet < 10) {
-    alert('Ставка должна быть числом ≥10!');
-    return;
-  }
-  if (bet > balance) {
-    alert('Недостаточно монет!');
-    return;
-  }
+    if (!betStr || isNaN(bet) || bet < 10) {
+      alert('Ставка должна быть числом ≥10!');
+      return;
+    }
+    if (bet > balance) {
+      alert('Недостаточно монет!');
+      return;
+    }
 
-  // Имя твоего бота (обязательно замени!)
-  const BOT_NAME = 'kostochki_game_bot';
+    const BOT_NAME = 'kostochki_game_bot';
+    let mention = user?.first_name || 'Игрок';
+    if (user?.username) mention = `@${user.username}`;
 
-  // Формируем упоминание
-  let mention = user?.first_name || 'Игрок';
-  if (user?.username) {
-    mention = `@${user.username}`;
-  }
+    const message = `${mention} вызывает на дуэль! Ставка: ${bet} монет 🎲\n\nИграть: https://t.me/${BOT_NAME}?startapp=duel_${bet}`;
 
-  // Формируем сообщение
-  const message = `${mention} вызывает на дуэль! Ставка: ${bet} монет 🎲\n\nИграть: https://t.me/${BOT_NAME}?startapp=duel_${bet}`;
-
-  // Копируем в буфер
-  navigator.clipboard.writeText(message).then(() => {
-    alert('✅ Сообщение скопировано!\nВставь его в чат с другом.');
-  }).catch(() => {
-    alert('Не удалось скопировать. Вручную:\n\n' + message);
-  });
-};
+    navigator.clipboard.writeText(message).then(() => {
+      alert('✅ Сообщение скопировано!\nВставь его в чат с другом.');
+    }).catch(() => {
+      alert('Не удалось скопировать. Вручную:\n\n' + message);
+    });
+  };
 
   Telegram.WebApp.ready();
 </script>
