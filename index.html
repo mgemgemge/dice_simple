@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Dice Duel</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      padding: 40px;
+      background: #f0f0f0;
+    }
+    button {
+      padding: 15px 30px;
+      font-size: 20px;
+      margin: 20px;
+      border: none;
+      background: #3b82f6;
+      color: white;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h2>🎲 Dice Duel</h2>
+  <p id="welcome">Загрузка...</p>
+  <p id="balance" style="font-size: 20px; font-weight: bold; color: #eab308;">💰 Баланс: 500 монет</p>
+  <button id="roll">Бросить кубик</button>
+  <div id="result"></div>
+
+  <script>
+    // Получаем данные из Telegram
+    const user = window.Telegram.WebApp.initDataUnsafe?.user;
+    document.getElementById('welcome').textContent = user 
+      ? `Привет, ${user.first_name}!` 
+      : 'Привет, друг!';
+
+    let balance = 500;
+
+    // Бросок кубика
+    document.getElementById('roll').onclick = () => {
+      const dice = Math.floor(Math.random() * 6) + 1;
+      document.getElementById('result').innerHTML = `<h1>Выпало: ${dice}!</h1>`;
+      if (window.navigator.vibrate) window.navigator.vibrate(100);
+    };
+
+    // Готовим Mini App
+    Telegram.WebApp.ready();
+  </script>
+</body>
+</html>
