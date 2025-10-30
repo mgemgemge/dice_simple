@@ -40,11 +40,16 @@
     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjbWNraXR2b3FidWxqYWRjZmV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE4NTYxMDIsImV4cCI6MjA3NzQzMjEwMn0.JI5Y2-cSxgGB-j9LtczU5vENrYhSS4Q_EeLAYLauDBU'                          // ← замени!
   );
 
-  const initData = window.Telegram.WebApp.initDataUnsafe;
-  const user = initData?.user;
-  const userId = user?.id.toString();
-  const username = user?.username || user?.first_name || 'друг';
-  const startParam = initData?.start_param;
+const initData = window.Telegram.WebApp.initDataUnsafe;
+if (!initData || !initData.user) {
+  document.getElementById('welcome').textContent = 'Ошибка: откройте через Telegram!';
+  throw new Error('Not in Telegram');
+}
+
+const user = initData.user;
+const userId = String(user.id); // безопасное преобразование
+const username = user.username || user.first_name || 'друг';
+const startParam = initData.start_param;
 
   document.getElementById('welcome').textContent = `Привет, ${username}!`;
 
