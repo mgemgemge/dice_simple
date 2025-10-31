@@ -5,44 +5,101 @@
   <title>Dice Duel</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
-    body { font-family: sans-serif; text-align: center; padding: 40px; }
-    button { padding: 15px 30px; font-size: 18px; margin: 10px; }
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: sans-serif;
+      background: #000;
+      color: white;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+    button {
+      padding: 16px 32px;
+      font-size: 20px;
+      margin: 20px;
+      border: none;
+      border-radius: 12px;
+      background: #3b82f6;
+      color: white;
+      cursor: pointer;
+    }
+    #result {
+      margin-top: 20px;
+      font-size: 24px;
+    }
   </style>
 </head>
 <body>
   <h2>🎲 Dice Duel</h2>
-  <p id="welcome">Загрузка...</p>
-  <p id="balance">💰 Баланс: —</p>
+
+  <!-- Верхняя панель с информацией -->
+  <div id="ui" style="
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    background: rgba(0,0,0,0.8);
+    color: white;
+    text-align: center;
+    padding: 15px;
+    font-size: 18px;
+    z-index: 1000;
+  ">
+    <div id="welcome">Загрузка...</div>
+    <div id="balance">💰 Баланс: —</div>
+  </div>
+
   <button id="roll">Бросить кубик</button>
+  <button id="challenge" style="background: #ef4444;">Вызвать друга</button>
+  <div id="result"></div>
 
   <script>
-    // Ждём, пока Telegram инициализирует данные
-    setTimeout(() => {
-      const initData = window.Telegram?.WebApp?.initDataUnsafe;
-      const user = initData?.user;
+    document.addEventListener('DOMContentLoaded', () => {
+      const welcomeEl = document.getElementById('welcome');
+      const balanceEl = document.getElementById('balance');
 
-      if (!user) {
-        document.getElementById('welcome').textContent = '⚠️ Откройте в Telegram!';
+      if (!window.Telegram?.WebApp?.initDataUnsafe?.user) {
+        welcomeEl.textContent = '❌ Откройте в Telegram!';
+        balanceEl.style.display = 'none';
         return;
       }
 
+      const user = window.Telegram.WebApp.initDataUnsafe.user;
       const name = user.username || user.first_name || 'друг';
-      document.getElementById('welcome').textContent = `Привет, ${name}!`;
 
       let balance = localStorage.getItem('dice_balance');
       if (!balance) {
         balance = 500;
         localStorage.setItem('dice_balance', '500');
       }
-      document.getElementById('balance').textContent = `💰 Баланс: ${balance} монет`;
+
+      welcomeEl.textContent = `Привет, ${name}!`;
+      balanceEl.textContent = `💰 Баланс: ${balance} монет`;
 
       document.getElementById('roll').onclick = () => {
         const dice = Math.floor(Math.random() * 6) + 1;
-        alert(`Выпало: ${dice}!`);
+        document.getElementById('result').innerHTML = `<h2>Выпало: ${dice}!</h2>`;
+        if (window.navigator.vibrate) window.navigator.vibrate(100);
+      };
+
+      document.getElementById('challenge').onclick = () => {
+        const bet = prompt('Ставка? (мин. 10)');
+        if (bet && !isNaN(bet) && bet >= 10 && bet <= balance) {
+          const msg = `${name} вызывает! Ставка: ${bet} монет 🎲\nИграть: https://t.me/kostochki_game_bot?startapp=duel_${bet}`;
+          navigator.clipboard.writeText(msg).then(() => {
+            alert('✅ Скопировано!');
+          }).catch(() => alert('❌ Не скопировалось:\n' + msg));
+        } else {
+          alert('Неверная ставка!');
+        }
       };
 
       Telegram.WebApp.ready();
-    }, 300);
+    });
   </script>
 </body>
 </html>
