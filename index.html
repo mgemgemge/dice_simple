@@ -8,7 +8,7 @@
     body {
       margin: 0;
       padding: 0;
-      font-family: sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background: #000;
       color: white;
       height: 100vh;
@@ -16,54 +16,66 @@
       flex-direction: column;
       justify-content: center;
       align-items: center;
+      text-align: center;
+    }
+    h2 {
+      margin-bottom: 20px;
     }
     button {
       padding: 16px 32px;
       font-size: 20px;
-      margin: 20px;
+      margin: 16px 0;
       border: none;
       border-radius: 12px;
-      background: #3b82f6;
       color: white;
       cursor: pointer;
+      font-weight: bold;
     }
-    #result {
-      margin-top: 20px;
-      font-size: 24px;
+    #roll { background: #3b82f6; }
+    #challenge { background: #ef4444; }
+    #ui {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      background: rgba(0, 0, 0, 0.85);
+      padding: 16px;
+      z-index: 1000;
+    }
+    #dice-container {
+      font-size: 60px;
+      margin: 20px;
+      min-height: 80px;
+      display: flex;
+      justify-content: center;
+      gap: 30px;
+      align-items: center;
     }
   </style>
 </head>
 <body>
-  <h2>🎲 Dice Duel</h2>
-
-  <!-- Верхняя панель с информацией -->
-  <div id="ui" style="
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    background: rgba(0,0,0,0.8);
-    color: white;
-    text-align: center;
-    padding: 15px;
-    font-size: 18px;
-    z-index: 1000;
-  ">
+  <div id="ui">
     <div id="welcome">Загрузка...</div>
     <div id="balance">💰 Баланс: —</div>
   </div>
 
+  <h2>🎲 Dice Duel</h2>
   <button id="roll">Бросить кубик</button>
-  <button id="challenge" style="background: #ef4444;">Вызвать друга</button>
-  <div id="result"></div>
+  <button id="challenge">Вызвать друга</button>
+
+  <div id="dice-container">
+    <div>?</div>
+    <div>?</div>
+  </div>
 
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       const welcomeEl = document.getElementById('welcome');
       const balanceEl = document.getElementById('balance');
 
+      // Проверка: запущено ли в Telegram
       if (!window.Telegram?.WebApp?.initDataUnsafe?.user) {
-        welcomeEl.textContent = '❌ Откройте в Telegram!';
+        welcomeEl.textContent = '❌ Откройте через Telegram!';
         balanceEl.style.display = 'none';
         return;
       }
@@ -71,31 +83,73 @@
       const user = window.Telegram.WebApp.initDataUnsafe.user;
       const name = user.username || user.first_name || 'друг';
 
+      // Баланс
       let balance = localStorage.getItem('dice_balance');
       if (!balance) {
         balance = 500;
         localStorage.setItem('dice_balance', '500');
+      } else {
+        balance = Number(balance);
       }
 
       welcomeEl.textContent = `Привет, ${name}!`;
       balanceEl.textContent = `💰 Баланс: ${balance} монет`;
 
+      // Эмодзи кубиков и анимации
+      const diceFaces = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+      const animChars = ['🎲', '🎯', '🎰', '🎱', '🔮', '✨', '💫', '⚡'];
+
+      // Бросок кубика
       document.getElementById('roll').onclick = () => {
-        const dice = Math.floor(Math.random() * 6) + 1;
-        document.getElementById('result').innerHTML = `<h2>Выпало: ${dice}!</h2>`;
-        if (window.navigator.vibrate) window.navigator.vibrate(100);
+        const container = document.getElementById('dice-container');
+        let step = 0;
+        const totalSteps = 12;
+
+        const animate = () => {
+          if (step < totalSteps) {
+            container.innerHTML = `
+              <div>${animChars[Math.floor(Math.random() * animChars.length)]}</div>
+              <div>${animChars[Math.floor(Math.random() * animChars.length)]}</div>
+            `;
+            step++;
+            setTimeout(animate, 100);
+          } else {
+            const d1 = Math.floor(Math.random() * 6) + 1;
+            const d2 = Math.floor(Math.random() * 6) + 1;
+            container.innerHTML = `
+              <div>${diceFaces[d1 - 1]}</div>
+              <div>${diceFaces[d2 - 1]}</div>
+            `;
+            if (window.navigator.vibrate) {
+              window.navigator.vibrate([100, 50, 100]);
+            }
+          }
+        };
+
+        // Сброс перед анимацией
+        container.innerHTML = '<div>?</div><div>?</div>';
+        setTimeout(animate, 100);
       };
 
+      // Вызов друга
       document.getElementById('challenge').onclick = () => {
-        const bet = prompt('Ставка? (мин. 10)');
-        if (bet && !isNaN(bet) && bet >= 10 && bet <= balance) {
-          const msg = `${name} вызывает! Ставка: ${bet} монет 🎲\nИграть: https://t.me/kostochki_game_bot?startapp=duel_${bet}`;
-          navigator.clipboard.writeText(msg).then(() => {
-            alert('✅ Скопировано!');
-          }).catch(() => alert('❌ Не скопировалось:\n' + msg));
-        } else {
-          alert('Неверная ставка!');
+        const betStr = prompt('Сколько монет поставить? (Минимум: 10)');
+        const bet = parseInt(betStr);
+
+        if (!betStr || isNaN(bet) || bet < 10 || bet > balance) {
+          alert('Ставка должна быть от 10 монет и не больше баланса!');
+          return;
         }
+
+        const BOT_NAME = 'kostochki_game_bot';
+        const mention = user.username ? `@${user.username}` : user.first_name;
+        const message = `${mention} вызывает на дуэль! Ставка: ${bet} монет 🎲\n\nИграть: https://t.me/${BOT_NAME}?startapp=duel_${bet}`;
+
+        navigator.clipboard.writeText(message).then(() => {
+          alert('✅ Ссылка скопирована!\nОтправьте её другу в чат.');
+        }).catch(() => {
+          prompt('❌ Копирование не поддерживается. Скопируйте вручную:', message);
+        });
       };
 
       Telegram.WebApp.ready();
