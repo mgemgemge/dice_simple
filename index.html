@@ -4,157 +4,45 @@
   <meta charset="utf-8">
   <title>Dice Duel</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    body {
-      font-family: sans-serif;
-      text-align: center;
-      padding: 20px;
-      background: #f0f0f0;
-      margin: 0;
-    }
-    button {
-      padding: 14px 28px;
-      font-size: 18px;
-      margin: 12px 0;
-      border: none;
-      border-radius: 10px;
-      cursor: pointer;
-    }
-    #mainBtns { margin-top: 20px; }
-    .blue { background: #3b82f6; color: white; }
-    .red { background: #ef4444; color: white; }
-    .green { background: #10b981; color: white; }
-    input {
-      padding: 12px;
-      font-size: 18px;
-      width: 180px;
-      margin: 10px 8px;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-    }
-    #betInput { display: none; }
+    body { font-family: sans-serif; text-align: center; padding: 40px; }
+    button { padding: 15px 30px; font-size: 18px; margin: 10px; }
   </style>
 </head>
 <body>
   <h2>🎲 Dice Duel</h2>
   <p id="welcome">Загрузка...</p>
-  <p id="balance">💰 Баланс: — монет</p>
-
-  <div id="mainBtns">
-    <button id="roll" class="blue">Бросить кубик</button>
-    <button id="challenge" class="red">Вызвать друга</button>
-  </div>
-
-  <div id="betInput">
-    <input type="number" id="betAmount" placeholder="Ставка (мин. 10)" min="10">
-    <br>
-    <button id="confirmBet" class="green">Создать дуэль</button>
-    <button id="cancelBet" class="blue">Отмена</button>
-  </div>
-
-  <div id="result"></div>
+  <p id="balance">💰 Баланс: —</p>
+  <button id="roll">Бросить кубик</button>
 
   <script>
-    document.addEventListener('DOMContentLoaded', async () => {
-      const welcomeEl = document.getElementById('welcome');
-      const balanceEl = document.getElementById('balance');
+    // Ждём, пока Telegram инициализирует данные
+    setTimeout(() => {
+      const initData = window.Telegram?.WebApp?.initDataUnsafe;
+      const user = initData?.user;
 
-      // Проверяем, запущено ли приложение в Telegram
-      if (!window.Telegram || !window.Telegram.WebApp || !window.Telegram.WebApp.initDataUnsafe) {
-        welcomeEl.textContent = '❌ Откройте игру через Telegram!';
-        balanceEl.style.display = 'none';
-        document.getElementById('mainBtns').style.display = 'none';
+      if (!user) {
+        document.getElementById('welcome').textContent = '⚠️ Откройте в Telegram!';
         return;
       }
 
-      const initData = window.Telegram.WebApp.initDataUnsafe;
-      const user = initData.user;
-      const userId = String(user.id);
-      const username = user.username || user.first_name || 'друг';
+      const name = user.username || user.first_name || 'друг';
+      document.getElementById('welcome').textContent = `Привет, ${name}!`;
 
-      // Баланс
       let balance = localStorage.getItem('dice_balance');
-      if (balance === null) {
+      if (!balance) {
         balance = 500;
         localStorage.setItem('dice_balance', '500');
-      } else {
-        balance = Number(balance);
       }
+      document.getElementById('balance').textContent = `💰 Баланс: ${balance} монет`;
 
-      welcomeEl.textContent = `Привет, ${username}!`;
-      balanceEl.textContent = `💰 Баланс: ${balance} монет`;
-
-      // Подключаем Supabase
-      const supabase = window.supabase.createClient(
-        'https://jcmckitvoqbuljadcfev.supabase.co',
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjbWNraXR2b3FidWxqYWRjZmV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE4NTYxMDIsImV4cCI6MjA3NzQzMjEwMn0.JI5Y2-cSxgGB-j9LtczU5vENrYhSS4Q_EeLAYLauDBU'
-      );
-
-      // === КНОПКИ ===
-
-      // Бросок кубика
       document.getElementById('roll').onclick = () => {
         const dice = Math.floor(Math.random() * 6) + 1;
-        document.getElementById('result').innerHTML = `<h2>Выпало: ${dice}!</h2>`;
-        if (window.navigator.vibrate) window.navigator.vibrate(100);
+        alert(`Выпало: ${dice}!`);
       };
 
-      // Вызвать друга — показываем поле ввода
-      document.getElementById('challenge').onclick = () => {
-        document.getElementById('betInput').style.display = 'block';
-        document.getElementById('mainBtns').style.display = 'none';
-      };
-
-      // Отмена
-      document.getElementById('cancelBet').onclick = () => {
-        document.getElementById('betInput').style.display = 'none';
-        document.getElementById('mainBtns').style.display = 'block';
-        document.getElementById('betAmount').value = '';
-      };
-
-      // Подтверждение ставки
-      document.getElementById('confirmBet').onclick = async () => {
-        const betStr = document.getElementById('betAmount').value.trim();
-        const bet = parseInt(betStr);
-
-        if (!betStr || isNaN(bet) || bet < 10) {
-          alert('Введите ставку от 10 монет!');
-          return;
-        }
-        if (bet > balance) {
-          alert('Недостаточно монет!');
-          return;
-        }
-
-        // Генерируем короткий ID дуэли (8 символов)
-        const id = Math.random().toString(36).substring(2, 10);
-
-        // Сохраняем в Supabase
-        const { error } = await supabase.from('duels').insert({
-          id: id,
-          player_a: userId,
-          bet: bet,
-          status: 'waiting'
-        });
-
-        if (error) {
-          console.error('Ошибка Supabase:', error);
-          alert('Не удалось создать дуэль. Попробуйте позже.');
-          return;
-        }
-
-        // Формируем сообщение
-        const mention = user.username ? `@${user.username}` : user.first_name;
-        const message = `${mention} вызывает на дуэль! Ставка: ${bet} монет 🎲\n\nИграть: https://t.me/kostochki_game_bot?startapp=${id}`;
-
-        // Копируем — это работает, потому что вызвано из кнопки
-        navigator.clipboard.writeText(message).then(() => {
-          alert('✅ Ссылка скопирована!\nОтправьте её другу в чат.');
-          document.getElementById('betInput').style.display = 'none';
-          document.getElementById('mainBtns').style.display = 'block';
-          document.getElementById('betAmount').value = '';
-        }).catch(() => {
-          // Если копирование не сработало — показываем сообщение
-          prompt('❌ Копирование заблокировано. Скопируйте вручную:', message);
-          document.getElementById('betInput').style.display = 'none';
+      Telegram.WebApp.ready();
+    }, 300);
+  </script>
+</body>
+</html>
