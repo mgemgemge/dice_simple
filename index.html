@@ -45,11 +45,20 @@
     #dice-container {
       font-size: 60px;
       margin: 20px;
-      min-height: 80px;
+      min-height: 120px;
       display: flex;
-      justify-content: center;
-      gap: 30px;
+      flex-direction: column;
       align-items: center;
+    }
+    .dice-pair {
+      display: flex;
+      gap: 30px;
+      margin-bottom: 10px;
+    }
+    .dice-value {
+      font-size: 24px;
+      color: #4ade80;
+      font-weight: bold;
     }
   </style>
 </head>
@@ -64,8 +73,11 @@
   <button id="challenge">Вызвать друга</button>
 
   <div id="dice-container">
-    <div>?</div>
-    <div>?</div>
+    <div class="dice-pair">
+      <div>?</div>
+      <div>?</div>
+    </div>
+    <div class="dice-value" id="dice-values">—</div>
   </div>
 
   <script>
@@ -73,7 +85,6 @@
       const welcomeEl = document.getElementById('welcome');
       const balanceEl = document.getElementById('balance');
 
-      // Проверка: запущено ли в Telegram
       if (!window.Telegram?.WebApp?.initDataUnsafe?.user) {
         welcomeEl.textContent = '❌ Откройте через Telegram!';
         balanceEl.style.display = 'none';
@@ -83,7 +94,6 @@
       const user = window.Telegram.WebApp.initDataUnsafe.user;
       const name = user.username || user.first_name || 'друг';
 
-      // Баланс
       let balance = localStorage.getItem('dice_balance');
       if (!balance) {
         balance = 500;
@@ -95,39 +105,35 @@
       welcomeEl.textContent = `Привет, ${name}!`;
       balanceEl.textContent = `💰 Баланс: ${balance} монет`;
 
-      // Эмодзи кубиков и анимации
-      const diceFaces = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
-      const animChars = ['🎲', '🎯', '🎰', '🎱', '🔮', '✨', '💫', '⚡'];
-
       // Бросок кубика
       document.getElementById('roll').onclick = () => {
-        const container = document.getElementById('dice-container');
+        const dicePair = document.querySelector('.dice-pair');
+        const valuesEl = document.getElementById('dice-values');
+        const totalSteps = 10;
         let step = 0;
-        const totalSteps = 12;
 
+        // Анимация: мелькающие кубики
         const animate = () => {
           if (step < totalSteps) {
-            container.innerHTML = `
-              <div>${animChars[Math.floor(Math.random() * animChars.length)]}</div>
-              <div>${animChars[Math.floor(Math.random() * animChars.length)]}</div>
-            `;
+            dicePair.innerHTML = `<div>🎲</div><div>🎲</div>`;
             step++;
-            setTimeout(animate, 100);
+            setTimeout(animate, 80);
           } else {
+            // Финальный результат
             const d1 = Math.floor(Math.random() * 6) + 1;
             const d2 = Math.floor(Math.random() * 6) + 1;
-            container.innerHTML = `
-              <div>${diceFaces[d1 - 1]}</div>
-              <div>${diceFaces[d2 - 1]}</div>
-            `;
+            dicePair.innerHTML = `<div>🎲</div><div>🎲</div>`;
+            valuesEl.textContent = `${d1} + ${d2} = ${d1 + d2}`;
+            
             if (window.navigator.vibrate) {
               window.navigator.vibrate([100, 50, 100]);
             }
           }
         };
 
-        // Сброс перед анимацией
-        container.innerHTML = '<div>?</div><div>?</div>';
+        // Сброс
+        dicePair.innerHTML = `<div>?</div><div>?</div>`;
+        valuesEl.textContent = '—';
         setTimeout(animate, 100);
       };
 
